@@ -206,9 +206,67 @@ def _synthesize_elevenlabs(
 # Gemini TTS (fallback)
 # ---------------------------------------------------------------------------
 
+GEMINI_TTS_VOICES = [
+    {"id": "Aoede", "tone": "Breezy, conversational, and intelligent", "gender": "Female"},
+    {"id": "Callirrhoe", "tone": "Easy-going, clear, and articulate", "gender": "Female"},
+    {"id": "Charon", "tone": "Informative, calm, and assured", "gender": "Male"},
+    {"id": "Fenrir", "tone": "Excitable, warm, and approachable", "gender": "Male"},
+    {"id": "Kore", "tone": "Firm, neutral, and professional", "gender": "Female"},
+    {"id": "Leda", "tone": "Youthful, professional, and composed", "gender": "Female"},
+    {"id": "Orus", "tone": "Firm, mature, and resonant", "gender": "Male"},
+    {"id": "Puck", "tone": "Upbeat, friendly, and energetic", "gender": "Male"},
+    {"id": "Zephyr", "tone": "Bright, perky, and enthusiastic", "gender": "Female"},
+]
+
+
+def _select_voice_gemini(style: dict) -> str:
+    """Pick the best Gemini TTS voice based on the style profile."""
+    from pydantic import BaseModel, Field
+    from pydantic_ai import Agent
+    from pydantic_ai.models.google import GoogleModel
+    from pydantic_ai.providers.google import GoogleProvider
+
+    class GeminiVoiceSelection(BaseModel):
+        voice_id: str = Field(description="The voice id (e.g. 'Fenrir', 'Puck')")
+        reasoning: str = Field(description="Why this voice matches the instructor")
+
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    provider = GoogleProvider(api_key=api_key)
+    model = GoogleModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), provider=provider)
+
+    selector = Agent(
+        model=model,
+        system_prompt=(
+            "You are a casting director. Pick the best Gemini TTS voice for a lecture narrator. "
+            "You will be given the instructor's style profile and a list of 9 available voices. "
+            "Match on energy, warmth, gender if inferable, and overall vibe."
+        ),
+        output_type=GeminiVoiceSelection,
+    )
+
+    style_summary = (
+        f"Character essence: {style.get('performance_notes', {}).get('character_essence', '')}\n"
+        f"Comparable personas: {style.get('performance_notes', {}).get('comparable_personas', [])}\n"
+        f"Overall tone: {style.get('tone_and_energy', {}).get('overall_tone', '')}\n"
+        f"Energy level: {style.get('tone_and_energy', {}).get('energy_level', '')}\n"
+        f"Warmth: {style.get('tone_and_energy', {}).get('warmth', '')}\n"
+        f"Instructor name: {style.get('instructor_name', 'Unknown')}\n"
+    )
+
+    result = selector.run_sync(
+        f"=== INSTRUCTOR STYLE ===\n{style_summary}\n\n"
+        f"=== AVAILABLE VOICES ===\n{json.dumps(GEMINI_TTS_VOICES, indent=2)}\n\n"
+        f"Pick the best matching voice."
+    )
+
+    print(f"  Voice selected: {result.output.voice_id} — {result.output.reasoning}")
+    return result.output.voice_id
+
+
 def _synthesize_gemini(
     narrations: list[dict],
     audio_dir: Path,
+    style: dict | None = None,
 ) -> list[Path]:
     """Synthesize narrations to MP3 using Gemini's TTS."""
     from google import genai
@@ -218,6 +276,12 @@ def _synthesize_gemini(
         raise RuntimeError("Set GEMINI_API_KEY or GOOGLE_API_KEY in .env")
 
     client = genai.Client(api_key=api_key)
+
+    # Auto-select voice from style profile
+    voice_name = "Puck"  # default
+    if style:
+        print("  Selecting Gemini voice from style profile...")
+        voice_name = _select_voice_gemini(style)
 
     saved: list[Path] = []
     total = len(narrations)
@@ -230,38 +294,50 @@ def _synthesize_gemini(
         print(f"  Slide {i}/{total}: synthesizing (Gemini) …", end=" ", flush=True)
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"Read the following lecture narration aloud naturally:\n\n{text}",
+            model="gemini-2.5-flash-preview-tts",
+            contents=text,
             config=genai.types.GenerateContentConfig(
                 response_modalities=["AUDIO"],
                 speech_config=genai.types.SpeechConfig(
                     voice_config=genai.types.VoiceConfig(
                         prebuilt_voice_config=genai.types.PrebuiltVoiceConfig(
-                            voice_name="Kore",
+                            voice_name=voice_name,
                         )
                     )
                 ),
             ),
         )
 
-        # Extract audio data from response
-        audio_data = response.candidates[0].content.parts[0].inline_data.data
+        # Extract raw PCM audio data from response
+        inline = response.candidates[0].content.parts[0].inline_data
+        audio_data = inline.data
+        mime = getattr(inline, "mime_type", "audio/L16;rate=24000")
 
-        # Gemini returns WAV — convert to MP3 if possible, otherwise save as wav
-        wav_file = out_file.with_suffix(".wav")
-        wav_file.write_bytes(audio_data)
+        # Parse sample rate from mime type (e.g. "audio/L16;rate=24000")
+        sample_rate = 24000
+        if "rate=" in str(mime):
+            try:
+                sample_rate = int(str(mime).split("rate=")[1].split(";")[0])
+            except (ValueError, IndexError):
+                pass
 
-        try:
-            import subprocess
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(wav_file), "-codec:a", "libmp3lame",
-                 "-qscale:a", "2", str(out_file)],
-                capture_output=True, check=True,
-            )
-            wav_file.unlink()
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            # No ffmpeg — just rename to mp3 (technically wrong but functional)
-            wav_file.rename(out_file)
+        # Write raw PCM as proper WAV, then convert to MP3
+        import struct, subprocess
+        raw_file = out_file.with_suffix(".raw")
+        raw_file.write_bytes(audio_data)
+
+        # Convert raw PCM → MP3 via ffmpeg
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-f", "s16le", "-ar", str(sample_rate), "-ac", "1",
+                "-i", str(raw_file),
+                "-codec:a", "libmp3lame", "-qscale:a", "2",
+                str(out_file),
+            ],
+            capture_output=True, check=True,
+        )
+        raw_file.unlink()
 
         size_kb = out_file.stat().st_size / 1024
         print(f"done ({size_kb:.0f} KB)")
@@ -305,7 +381,7 @@ def generate_audio(
     if provider == "elevenlabs":
         return _synthesize_elevenlabs(narrations, audio_dir, style, voice_id)
     elif provider == "gemini":
-        return _synthesize_gemini(narrations, audio_dir)
+        return _synthesize_gemini(narrations, audio_dir, style)
     else:
         raise ValueError(f"Unknown provider: {provider}. Use 'elevenlabs' or 'gemini'.")
 
