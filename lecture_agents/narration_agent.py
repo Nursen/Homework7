@@ -86,6 +86,27 @@ LENGTH:
   slide needs more narration than a simple transition slide.
 - Don't pad with filler, but don't rush through complex ideas either.
 
+DELIVERY CUES FOR TEXT-TO-SPEECH:
+This narration will be read aloud by a TTS engine. To make it sound alive, you \
+MUST embed inline performance cues using parenthetical stage directions. The TTS \
+engine interprets these. Use them naturally throughout — not on every sentence, \
+but at emotional inflection points. Examples:
+
+- (laughing) before or after a joke
+- (excited) before an enthusiastic reveal
+- (serious tone) when stakes get real
+- (pause) for dramatic effect or to let a point land
+- (whispering) for conspiratorial asides
+- (sighing) for self-deprecating moments
+- (louder) when energy peaks
+- (thoughtful) when working through an idea
+
+Also use punctuation expressively:
+- "..." for trailing off / thinking pauses (TTS reads these as real pauses)
+- "!" for genuine excitement (not overused)
+- "?" with rising intonation for rhetorical questions
+- ALL CAPS sparingly for real emphasis on a single word
+
 You are writing a performance script. Every word should sound like it came from \
 this specific instructor's mouth — including the tangents, the mistakes, and the \
 messy humanity.\

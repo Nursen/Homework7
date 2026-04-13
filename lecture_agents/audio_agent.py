@@ -6,12 +6,41 @@ Includes intelligent voice selection based on the instructor's style profile.
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _sanitize_for_tts(text: str) -> str:
+    """Strip markdown formatting that TTS engines mangle.
+
+    - Backtick code refs: `premise.json` → premise dot json
+    - Asterisk emphasis: *really* → really
+    - Em-dashes: — → ,
+    - .json / .mp3 / .py extensions: spoken naturally
+    """
+    # Replace .json, .mp3, .py etc. inside backticks with spoken form
+    text = re.sub(r'`([^`]+)`', lambda m: m.group(1), text)
+
+    # Make file extensions speakable
+    text = text.replace(".json", " dot json")
+    text = text.replace(".mp3", " dot mp3")
+    text = text.replace(".mp4", " dot mp4")
+    text = text.replace(".py", " dot py")
+    text = text.replace(".pdf", " dot pdf")
+
+    # Strip asterisk emphasis
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+
+    # Em-dashes to commas (more natural pause)
+    text = text.replace(" — ", ", ")
+    text = text.replace("—", ", ")
+
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -122,17 +151,29 @@ def _synthesize_elevenlabs(
 
     for entry in narrations:
         i = entry["slide_number"]
-        text = entry["narration"]
+        text = _sanitize_for_tts(entry["narration"])
         out_file = audio_dir / f"slide_{i:03d}.mp3"
 
         print(f"  Slide {i}/{total}: synthesizing …", end=" ", flush=True)
 
         # ElevenLabs returns an iterator of bytes
+        # Voice settings tuned for expressive, lecture-style delivery:
+        #   - Low stability (0.3): more variation in pitch/emotion, less monotone
+        #   - High similarity (0.75): stays close to the voice's natural character
+        #   - High style exaggeration (0.7): leans into emotional cues in the text
+        #   - Speaker boost on: adds presence and clarity
+        from elevenlabs import VoiceSettings
         audio_iter = client.text_to_speech.convert(
             voice_id=voice_id,
             text=text,
             model_id="eleven_multilingual_v2",
             output_format="mp3_44100_128",
+            voice_settings=VoiceSettings(
+                stability=0.3,
+                similarity_boost=0.75,
+                style=0.7,
+                use_speaker_boost=True,
+            ),
         )
 
         # Merge chunks into one file
@@ -169,7 +210,7 @@ def _synthesize_gemini(
 
     for entry in narrations:
         i = entry["slide_number"]
-        text = entry["narration"]
+        text = _sanitize_for_tts(entry["narration"])
         out_file = audio_dir / f"slide_{i:03d}.mp3"
 
         print(f"  Slide {i}/{total}: synthesizing (Gemini) …", end=" ", flush=True)
