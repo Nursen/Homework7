@@ -1,0 +1,7 @@
+pydantic
+pydantic-ai
+google-genai
+elevenlabs
+python-dotenv
+pdf2image
+Pillow

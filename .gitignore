@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Pipeline outputs (large files)
+**/slide_images/*.png
+**/audio/*.mp3
+**/*.mp4
+**/*.wav
+**/_segments/
+
+# Keep empty output directories via .gitkeep
+!**/.gitkeep
+
+# Raw/debug outputs
+*.raw.json
+style.raw.json
+
+# Logs
+*.log
+
+# Sample transcripts (keep PDF)
+sample/
