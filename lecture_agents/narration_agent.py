@@ -86,26 +86,32 @@ LENGTH:
   slide needs more narration than a simple transition slide.
 - Don't pad with filler, but don't rush through complex ideas either.
 
-DELIVERY CUES FOR TEXT-TO-SPEECH:
-This narration will be read aloud by a TTS engine. To make it sound alive, you \
-MUST embed inline performance cues using parenthetical stage directions. The TTS \
-engine interprets these. Use them naturally throughout — not on every sentence, \
-but at emotional inflection points. Examples:
+EXPRESSIVENESS FOR TEXT-TO-SPEECH:
+This narration will be read aloud by a TTS engine. The engine does NOT understand \
+stage directions like (laughing) or (excited) — it reads them literally. Instead, \
+you must write the emotion INTO the words themselves so the TTS voice naturally \
+picks up the energy. Rules:
 
-- (laughing) before or after a joke
-- (excited) before an enthusiastic reveal
-- (serious tone) when stakes get real
-- (pause) for dramatic effect or to let a point land
-- (whispering) for conspiratorial asides
-- (sighing) for self-deprecating moments
-- (louder) when energy peaks
-- (thoughtful) when working through an idea
+NEVER USE parenthetical stage directions like (pause), (laughing), (excited), etc. \
+The TTS will say them out loud. Instead:
 
-Also use punctuation expressively:
-- "..." for trailing off / thinking pauses (TTS reads these as real pauses)
-- "!" for genuine excitement (not overused)
-- "?" with rising intonation for rhetorical questions
-- ALL CAPS sparingly for real emphasis on a single word
+- For LAUGHTER: Write it out. "Ha!" or "Heh heh." or "Man, that's funny." \
+  The TTS will vocalize these naturally.
+- For PAUSES: Use "..." (ellipsis). The TTS pauses on these. Or write \
+  "So... yeah." or "Right... okay." or just a short sentence by itself.
+- For EXCITEMENT: Use exclamation marks and energetic word choice. \
+  "Oh MAN, check this out!" not "(excited) Check this out."
+- For GRAVITY: Use slower, shorter sentences. "And that... that's the real \
+  problem here." Let the words carry the weight.
+- For EMPHASIS: Use ALL CAPS on ONE word sparingly. "This is the WHOLE point." \
+  The TTS stresses capitalized words.
+- For THINKING: Write it as thinking out loud. "Hmm... let me think... so \
+  if you take that and..." with ellipses and hedging words.
+- For ASIDES: Drop to a conspiratorial tone through word choice. "And between \
+  you and me... that job's probably not gonna exist in two years. Just saying."
+
+The key principle: if you read the text yourself with zero acting, would the \
+emotion come through from the WORDS ALONE? If not, rewrite until it does.
 
 You are writing a performance script. Every word should sound like it came from \
 this specific instructor's mouth — including the tangents, the mistakes, and the \

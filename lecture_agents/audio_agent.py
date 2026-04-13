@@ -16,13 +16,23 @@ load_dotenv()
 
 
 def _sanitize_for_tts(text: str) -> str:
-    """Strip markdown formatting that TTS engines mangle.
+    """Strip formatting and stage directions that TTS engines read aloud.
 
+    - Parenthetical cues: (pause) → ..., (laughing) → heh, others removed
     - Backtick code refs: `premise.json` → premise dot json
     - Asterisk emphasis: *really* → really
     - Em-dashes: — → ,
-    - .json / .mp3 / .py extensions: spoken naturally
+    - File extensions: spoken naturally
     """
+    # Convert useful parenthetical cues to TTS-native equivalents
+    text = re.sub(r'\(pause\)', '...', text)
+    text = re.sub(r'\(laughing\)', 'heh,', text)
+    text = re.sub(r'\(chuckles?\)', 'heh,', text)
+    text = re.sub(r'\(sighing?\)', 'ahh,', text)
+
+    # Strip all remaining parenthetical stage directions
+    text = re.sub(r'\([a-z][a-z ]*\)\s*', '', text)
+
     # Replace .json, .mp3, .py etc. inside backticks with spoken form
     text = re.sub(r'`([^`]+)`', lambda m: m.group(1), text)
 
@@ -149,20 +159,22 @@ def _synthesize_elevenlabs(
     saved: list[Path] = []
     total = len(narrations)
 
-    for entry in narrations:
+    from elevenlabs import VoiceSettings
+
+    # Sanitize all texts upfront for previous_text / next_text stitching
+    sanitized = [_sanitize_for_tts(e["narration"]) for e in narrations]
+
+    for idx, entry in enumerate(narrations):
         i = entry["slide_number"]
-        text = _sanitize_for_tts(entry["narration"])
+        text = sanitized[idx]
         out_file = audio_dir / f"slide_{i:03d}.mp3"
+
+        # Provide surrounding text so TTS matches emotional tone across slides
+        prev_text = sanitized[idx - 1][-1000:] if idx > 0 else None
+        next_text = sanitized[idx + 1][:1000] if idx < total - 1 else None
 
         print(f"  Slide {i}/{total}: synthesizing …", end=" ", flush=True)
 
-        # ElevenLabs returns an iterator of bytes
-        # Voice settings tuned for expressive, lecture-style delivery:
-        #   - Low stability (0.3): more variation in pitch/emotion, less monotone
-        #   - High similarity (0.75): stays close to the voice's natural character
-        #   - High style exaggeration (0.7): leans into emotional cues in the text
-        #   - Speaker boost on: adds presence and clarity
-        from elevenlabs import VoiceSettings
         audio_iter = client.text_to_speech.convert(
             voice_id=voice_id,
             text=text,
@@ -174,6 +186,8 @@ def _synthesize_elevenlabs(
                 style=0.7,
                 use_speaker_boost=True,
             ),
+            previous_text=prev_text,
+            next_text=next_text,
         )
 
         # Merge chunks into one file
